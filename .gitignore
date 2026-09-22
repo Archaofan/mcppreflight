@@ -1,0 +1,8 @@
+﻿# build artifacts
+*.exe
+*.zip
+dist/
+.toolchain/
+mcp.json
+config.json
+*.log

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP点检助手</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">MCP点检助手</div>
+
+    <section>
+      <h3>模型设置（DeepSeek）</h3>
+      <label>API 地址</label>
+      <input id="cfg-base" type="text" placeholder="https://api.deepseek.com" spellcheck="false">
+      <label>API Key</label>
+      <input id="cfg-key" type="password" placeholder="sk-..." spellcheck="false">
+      <label>模型</label>
+      <div class="row">
+        <input id="cfg-model" type="text" placeholder="deepseek-chat" spellcheck="false">
+        <button id="btn-models" class="mini" title="从 API 获取可用模型列表">获取</button>
+      </div>
+      <div class="row">
+        <button id="btn-save-cfg" class="primary block">保存配置</button>
+      </div>
+      <div id="cfg-msg" class="hint"></div>
+    </section>
+
+    <section>
+      <h3>工作区</h3>
+      <div class="row">
+        <button id="btn-pick" class="block">选择工作区文件夹</button>
+      </div>
+      <div id="ws-path" class="hint">未选择</div>
+    </section>
+
+    <section>
+      <h3>MCP 服务器</h3>
+      <label>mcp.json 路径</label>
+      <div class="row">
+        <input id="cfg-mcp" type="text" spellcheck="false">
+        <button id="btn-reload" class="mini" title="重新读取 mcp.json 并连接">加载</button>
+      </div>
+      <div id="server-list"></div>
+    </section>
+
+    <section>
+      <button id="btn-reset" class="block">新会话</button>
+    </section>
+  </aside>
+
+  <main id="main">
+    <div id="chat"></div>
+    <div id="composer">
+      <textarea id="input" rows="3" placeholder="输入点检指令，例如：请对当前工作区执行点检并输出报告（Enter 发送，Shift+Enter 换行）"></textarea>
+      <button id="btn-send" class="primary">发送</button>
+    </div>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
