@@ -83,7 +83,9 @@
       if (line.indexOf("|") !== -1 && lines[i + 1] && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
         flushPara(); closeList();
         html.push("<table>");
-        var heads = line.split("|").map(function (x) { return x.trim(); }).filter(function (x, idx, arr) { return x !== "" || arr.length > 2; });
+        var heads = line.split("|").map(function (x) { return x.trim(); });
+        if (heads.length && heads[0] === "") heads.shift();
+        if (heads.length && heads[heads.length - 1] === "") heads.pop();
         html.push("<tr>" + heads.map(function (h) { return "<th>" + inline(h) + "</th>"; }).join("") + "</tr>");
         i++;
         inTable = true;

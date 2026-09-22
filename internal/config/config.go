@@ -33,6 +33,7 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, err
 	}
+	b = trimBOM(b)
 	if err := json.Unmarshal(b, c); err != nil {
 		return nil, err
 	}
@@ -75,11 +76,20 @@ func LoadMCPFile(path string) (*MCPFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	b = trimBOM(b)
 	var f MCPFile
 	if err := json.Unmarshal(b, &f); err != nil {
 		return nil, err
 	}
 	return &f, nil
+}
+
+// trimBOM 去掉 UTF-8 BOM（记事本/ PowerShell 5.1 保存的 JSON 常带 BOM）。
+func trimBOM(b []byte) []byte {
+	if len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
+		return b[3:]
+	}
+	return b
 }
 
 // ExeDir 返回可执行文件所在目录（配置文件默认放在这里）。

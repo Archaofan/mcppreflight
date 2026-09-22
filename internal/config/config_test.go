@@ -58,3 +58,31 @@ func TestLoadMCPFile(t *testing.T) {
 		t.Fatalf("解析 dianjian 失败: %+v", dj)
 	}
 }
+
+func TestLoadWithBOM(t *testing.T) {
+	dir := t.TempDir()
+	// 记事本 / PowerShell 5.1 保存的 UTF-8 带 BOM
+	path := filepath.Join(dir, "mcp.json")
+	withBOM := append([]byte{0xEF, 0xBB, 0xBF}, []byte(`{"mcpServers":{"a":{"url":"http://h/mcp"}}}`)...)
+	if err := os.WriteFile(path, withBOM, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := LoadMCPFile(path)
+	if err != nil {
+		t.Fatalf("带 BOM 的 mcp.json 应能解析: %v", err)
+	}
+	if len(f.MCPServers) != 1 {
+		t.Fatalf("解析异常: %+v", f)
+	}
+
+	cfgPath := filepath.Join(dir, "config.json")
+	withBOM2 := append([]byte{0xEF, 0xBB, 0xBF}, []byte(`{"api_key":"sk-x","model":"m"}`)...)
+	os.WriteFile(cfgPath, withBOM2, 0o644)
+	c, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("带 BOM 的 config.json 应能解析: %v", err)
+	}
+	if c.APIKey != "sk-x" {
+		t.Fatalf("解析异常: %+v", c)
+	}
+}

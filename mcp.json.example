@@ -1,0 +1,9 @@
+{
+  "_comment": "把 url 改成你的点检 MCP 服务器地址；type 可省略（默认 Streamable HTTP），也可写 sse；headers 按需填写鉴权 Token。保存后回到工具界面点「加载」。",
+  "mcpServers": {
+    "dianjian": {
+      "url": "http://192.168.1.10:3000/mcp",
+      "type": "streamableHttp"
+    }
+  }
+}
