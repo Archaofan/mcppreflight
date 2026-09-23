@@ -1,8 +1,14 @@
-﻿# build artifacts
+# build artifacts
 *.exe
 *.zip
 dist/
 .toolchain/
+
+# 用户数据（exe 同目录生成）
 mcp.json
 config.json
 *.log
+
+# WebView2 运行时缓存（exe 名 + .webview2 目录）
+*.exe.webview2/
+*.webview2/
