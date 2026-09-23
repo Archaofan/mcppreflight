@@ -163,8 +163,16 @@ func main() {
 			}
 			_ = json.Unmarshal(req.Params, &params)
 			log.Printf("[mock-mcp] tools/call name=%s args=%v", params.Name, params.Arguments)
+			// 模拟一份较大的点检报告（约 9000 字），用于验证大结果处理
+			var sb strings.Builder
+			sb.WriteString("点检完成：共扫描 128 个文件；发现 3 个问题（1 高危 / 1 中危 / 1 低危）；报告已生成。\n\n")
+			sb.WriteString("================ 详细点检明细 ================\n")
+			for i := 1; i <= 120; i++ {
+				sb.WriteString(fmt.Sprintf("【条目 %03d】路径：src/module%02d/file%02d.go  状态：正常  说明：静态扫描未发现问题，符合编码规范。\n", i, i%20+1, i%30+1))
+			}
+			sb.WriteString("================ 报告结束 ================\n")
 			writeRPC(w, req.ID, map[string]interface{}{
-				"content": []map[string]string{{"type": "text", "text": "点检完成：共扫描 128 个文件；发现 3 个问题（1 高危 / 1 中危 / 1 低危）；报告已生成。"}},
+				"content": []map[string]string{{"type": "text", "text": sb.String()}},
 			})
 		default:
 			writeRPCError(w, req.ID, -32601, "method not found: "+req.Method)

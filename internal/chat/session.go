@@ -13,6 +13,20 @@ import (
 	"mcpcheck/internal/mcp"
 )
 
+const (
+	// displayToolResultLimit 是推送给界面的工具结果上限。
+	// 界面侧可折叠/滚动展示，因此给得很大，仅在极端异常（数百 KB）时才截断。
+	displayToolResultLimit = 500000
+	// llmToolResultLimit 是单条工具结果送入 LLM 的字符上限，
+	// 防止大报告挤占模型上下文导致请求失败。
+	llmToolResultLimit = 16000
+	// historyBudget 是送入 LLM 的历史总字符预算；
+	// 超出后从最旧的工具结果开始省略，避免多轮点检累积爆上下文。
+	historyBudget = 40000
+	// omittedToolResult 是历史修剪后的占位说明。
+	omittedToolResult = "（该条历史工具结果过长已省略，完整内容见上方聊天界面；如需重新获取可再次调用工具）"
+)
+
 // Event 是推送给 UI 的对话事件。
 type Event struct {
 	Type string `json:"type"` // assistant_delta | tool_call | tool_result | done | error
@@ -79,6 +93,7 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 
 	const maxRounds = 8
 	for round := 0; round < maxRounds; round++ {
+		s.trimHistory()
 		tools := s.mcpMgr.AllTools()
 		var streamed strings.Builder
 		resp, err := client.ChatStream(ctx, s.messages(), tools, func(delta string) {
@@ -111,16 +126,40 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 			if err != nil {
 				result = "工具调用失败：" + err.Error()
 			}
-			emit(Event{Type: "tool_result", Name: tc.Function.Name, Text: truncateRunes(result, 4000)})
+			// 界面拿完整内容（可滚动/展开），LLM 侧按上限保护上下文
+			emit(Event{Type: "tool_result", Name: tc.Function.Name, Text: truncateRunes(result, displayToolResultLimit)})
 			s.history = append(s.history, llm.Message{
 				Role:       "tool",
 				ToolCallID: tc.ID,
-				Content:    result,
+				Content:    truncateRunes(result, llmToolResultLimit),
 			})
 		}
 	}
 	emit(Event{Type: "error", Text: "工具调用轮次过多，已停止。请尝试把需求描述得更具体。"})
 	return fmt.Errorf("工具调用轮次超过上限")
+}
+
+// trimHistory 在历史超过预算时，从最旧的工具结果开始省略内容，
+// 防止多轮点检累积导致请求超出模型上下文。
+func (s *Session) trimHistory() {
+	total := 0
+	for i := range s.history {
+		total += len([]rune(s.history[i].Content))
+	}
+	if total <= historyBudget {
+		return
+	}
+	for i := len(s.history) - 1; i >= 0; i-- {
+		m := &s.history[i]
+		if m.Role != "tool" || m.Content == omittedToolResult {
+			continue
+		}
+		total -= len([]rune(m.Content))
+		m.Content = omittedToolResult
+		if total <= historyBudget*3/4 {
+			return
+		}
+	}
 }
 
 func truncateRunes(s string, n int) string {

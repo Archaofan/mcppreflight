@@ -284,10 +284,30 @@
     var html = '<div class="role">助手</div>';
     if (kind === "call") {
       html += '<div class="toolcard"><span class="t">🔧 调用 MCP 工具：' + esc(name) + "</span><pre>" + esc(args || "{}") + "</pre></div>";
+      d.innerHTML = html;
     } else {
-      html += '<div class="resultcard"><span class="t">📄 工具返回：' + esc(name) + "</span><pre>" + esc(result || "") + "</pre></div>";
+      html += '<div class="resultcard"><span class="t">📄 工具返回：' + esc(name) + '</span><span class="len"></span></div>';
+      d.innerHTML = html;
+      var card = d.querySelector(".resultcard");
+      var pre = document.createElement("pre");
+      pre.textContent = result || "";
+      card.appendChild(pre);
+      var len = (result || "").length;
+      if (len > 1200) {
+        pre.classList.add("clamped");
+        d.querySelector(".len").textContent = "（" + len + " 字）";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "expand-btn";
+        btn.textContent = "展开全文";
+        btn.addEventListener("click", function () {
+          var open = pre.classList.toggle("open");
+          btn.textContent = open ? "收起" : "展开全文";
+          scrollBottom();
+        });
+        card.appendChild(btn);
+      }
     }
-    d.innerHTML = html;
     chatEl.appendChild(d); scrollBottom();
     return d;
   }

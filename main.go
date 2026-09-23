@@ -126,7 +126,7 @@ func runHeadless(session *chat.Session, message string) {
 func truncateForPrint(s string) string {
 	r := []rune(s)
 	if len(r) > 3000 {
-		return string(r[:3000]) + "\n…（截断）"
+		return string(r[:3000]) + fmt.Sprintf("\n…（控制台展示截断，完整内容共 %d 字；图形界面中可完整查看）", len(r))
 	}
 	return s
 }
