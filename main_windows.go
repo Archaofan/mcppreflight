@@ -32,6 +32,8 @@ func newWebView(url string) (w webview.WebView) {
 			Width:  1280,
 			Height: 820,
 			Center: true,
+			// 1 = rsrc 嵌入的 RT_GROUP_ICON 资源 ID（见 tools/icon 与 build.ps1）
+			IconId: 1,
 		},
 	}
 	if dataPath != "" {

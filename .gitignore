@@ -12,3 +12,6 @@ config.json
 # WebView2 运行时缓存（exe 名 + .webview2 目录）
 *.exe.webview2/
 *.webview2/
+
+# rsrc 生成的 COFF 资源对象（由 build.ps1 重新生成）
+*.syso

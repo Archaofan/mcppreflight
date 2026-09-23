@@ -23,6 +23,15 @@ $env:GOPROXY = "https://goproxy.cn,direct"
 $dist = Join-Path $root "dist"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
+Write-Host "==> 生成图标资源（SVG -> ICO -> rsrc.syso）"
+Push-Location (Join-Path $root "tools\icon")
+& go run . -in "mcp-icon.svg" -out (Join-Path $root "internal\app\icon.ico")
+$icoExit = $LASTEXITCODE
+Pop-Location
+if ($icoExit -ne 0) { Write-Warning "ICO 生成失败，改用仓库中的 internal\app\icon.ico" }
+& go run github.com/akavel/rsrc@latest -ico (Join-Path $root "internal\app\icon.ico") -o (Join-Path $root "rsrc_windows_amd64.syso")
+if ($LASTEXITCODE -ne 0) { Write-Warning "图标嵌入失败，exe 将使用系统默认图标（不影响功能）" }
+
 Write-Host "==> go vet"
 & go vet ./...
 if ($LASTEXITCODE -ne 0) { Write-Error "go vet 失败"; exit 1 }

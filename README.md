@@ -34,6 +34,9 @@ internal/
   chat/                 会话编排：系统提示（含工作区）→ LLM ⇄ MCP 循环（≤8 轮）
   app/                  HTTP API + SSE 推送 + go:embed 嵌入式单页 UI
 cmd/mock/               开发用 Mock：假 DeepSeek（:9811）+ 假 MCP（:9812）
+tools/
+  icon/                 SVG → 多尺寸 ICO 工具（构建期生成应用图标）
+  peicon/               PE 资源检查器：验证 exe 是否嵌入图标
 ```
 
 数据流：`WebView2/浏览器 → http://127.0.0.1:PORT → REST/SSE → chat.Session → (llm ⇄ mcp.Manager)`
@@ -61,10 +64,17 @@ go test ./...                                 # 单元 + 集成（httptest 假 M
 
 ## 构建
 
-`build.ps1`：`go vet` + `go test ./...` + `go build -ldflags="-s -w"` → `dist\MCP点检助手.exe`（含 `cmd/mock`）。产物约 7.8 MB。
+`build.ps1`：图标生成（SVG → ICO → rsrc.syso）+ `go vet` + `go test ./...` + `go build -ldflags="-s -w"` → `dist\MCP点检助手.exe`（含 `cmd/mock`）。产物约 7.8 MB。
 （脚本内含中文，需以 `powershell -ExecutionPolicy Bypass -File .\build.ps1` 方式运行；Windows PowerShell 5.1 不会直接执行未签名的 .ps1。）
 
 发布给同事时只需拷贝 **`dist\MCP点检助手.exe`**（或连同 `mcp.json.example` 改名后的 `mcp.json`），无需安装任何运行时。
+
+### 应用图标
+
+- 源文件：`tools/icon/mcp-icon.svg`（600×600 单色 logo）
+- `build.ps1` 中 `tools/icon` 用 `tdewolff/canvas` 把它栅格化为 8 个尺寸（16/20/24/32/40/48/64/256）并打包成 `internal/app/icon.ico`，再由 `akavel/rsrc` 生成 `rsrc_windows_amd64.syso` 嵌入 exe（Go 链接器自动识别同目录 `*.syso`）
+- `main_windows.go` 中 `IconId: 1` 对应 rsrc 分配的第一个 RT_GROUP_ICON 资源 ID，WebView2 窗口与任务栏即显示该图标
+- 验证嵌入结果：`go run ./tools/peicon <exe>`（解析 PE 资源目录，列出图标组与全部尺寸）
 
 ## 已知边界
 
