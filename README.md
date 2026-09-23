@@ -1,48 +1,73 @@
-# MCP点检助手（mcppreflight）
+# MCP点检助手 · mcppreflight
 
-极简 Windows 桌面工具：在聊天界面中通过 **DeepSeek 等 12 家 OpenAI 兼容 API** 调用 MCP 点检工具，对软件工程目录执行点检并输出报告。
+**简体中文** ｜ [English](README_EN.md)
 
-- **单文件 exe**（约 8 MB，Go 静态编译，无运行时依赖），Win10/Win11 直接双击运行
-- **GUI 开箱即用**：WebView2 渲染的本地界面（未装 WebView2 时自动回退系统浏览器），三栏布局：左侧配置、中间对话与报告、右侧「MCP 工具调用」面板（参数/返回/状态实时可见）
-- **多服务商**：DeepSeek（默认）/ 阿里云百炼 / 智谱 GLM / Kimi / 讯飞星火 / MiniMax / 硅基流动 / 火山方舟 / 百度千帆 / 腾讯混元 / Ollama（本地）/ OpenRouter / 自定义（one-api 等中转），base_url 与模型清单按官方文档逐字符核对
-- **中英双语 + 浅色/暗色**：左侧「外观」随时切换，写入 config.json
-- **零手写 JSON 之外的配置**：界面内完成 API Key、模型、工作区、mcp.json 全部配置
-- **http only**：MCP 新服务器支持 Streamable HTTP / SSE 两种传输，stdio 类型明确标注「暂不支持」
-- 本地 API 服务仅监听 `127.0.0.1`，无外网监听、无遥测
+极简 Windows 桌面工具：在聊天窗口里让大模型（默认 DeepSeek，也可切换到其他 12 家服务商）调用 MCP 点检工具，对软件工程目录执行点检并输出报告。
 
-> 使用者视角的说明见 [使用说明.md](使用说明.md)；本文档面向开发者。
+单文件 exe，约 8 MB，Go 静态编译，**不需要 .NET / Node / Python / VC++ 运行库**，Win10 / Win11 双击即用。
+
+![界面截图（浅色主题）](docs/screenshot.png)
+
+---
+
+## 特性
+
+- **单文件绿色小工具**：一个 exe 拷走就能用，无安装动作、无注册表残留
+- **多服务商**：DeepSeek / 阿里云百炼 / 智谱 GLM / Kimi / 讯飞星火 / MiniMax / 硅基流动 / 火山方舟 / 百度千帆 / 腾讯混元 / Ollama（本地）/ OpenRouter，以及「自定义」填任意 OpenAI 兼容地址（含 one-api 等中转）
+- **三栏界面**：左侧配置、中间对话与报告、右侧「MCP 工具调用」面板（参数 / 返回 / 状态实时可见，浅黄=参数、浅绿=返回、浅红=失败）
+- **工具返回完整保留**：长结果默认折叠、可展开，标签旁显示总字数；送给模型的内容另做长度保护
+- **中英双语 + 浅色 / 暗色**：左侧「外观」随时切换，写入 `config.json`
+- **http only**：MCP 支持 Streamable HTTP / SSE，stdio 类型明确标注「暂不支持」
+- **离线可用**：界面不加载任何外部 CDN 资源，本地服务仅监听 `127.0.0.1`，无遥测
+
+## 支持的服务商
+
+| 服务商 | Base URL | 工具调用 | 备注 |
+| --- | --- | --- | --- |
+| **DeepSeek**（默认） | `https://api.deepseek.com` | ✅ 完整 | 无 `/v1` 后缀；默认模型 `deepseek-flash` |
+| 阿里云百炼（通义千问） | `https://dashscope.aliyuncs.com/compatible-mode/v1` | ✅ 完整 | Key 与地域绑定 |
+| 智谱 BigModel（GLM） | `https://open.bigmodel.cn/api/paas/v4` | ✅ 完整 | `tool_choice` 仅支持 `auto` |
+| Moonshot（Kimi） | `https://api.moonshot.cn/v1` | ✅ 完整 | k2.x 仅支持 `auto`/`none` |
+| 讯飞星火（Spark） | `https://spark-api-open.xf-yun.com/v1` | ⚠️ 部分 | 自动下发 `tool_calls_switch=true` |
+| MiniMax | `https://api.minimax.cn/v1` | ✅ 完整 | M2.x 思考模式不可关闭 |
+| 硅基流动（SiliconFlow） | `https://api.siliconflow.com/v1` | ⚠️ 部分 | 自动下发 `enable_thinking=false` |
+| 火山方舟（豆包） | `https://ark.cn-beijing.volces.com/api/v3` | ⚠️ 部分 | model 可填 `ep-` 接入点 ID，需先开通模型 |
+| 百度千帆（文心） | `https://qianfan.baidubce.com/v2` | ⚠️ 部分 | 需 v2 + 静态 API Key |
+| 腾讯混元 | `https://api.hunyuan.cloud.tencent.com/v1` | ⚠️ 部分 | 仅 turbos/t1/functioncall 支持工具调用 |
+| Ollama（本地） | `http://localhost:11434/v1` | ✅ 完整 | Key 可留空；不下发 `tool_choice` |
+| OpenRouter | `https://openrouter.ai/api/v1` | ✅ 完整 | 模型为 `厂商/模型` 格式 |
+| 自定义 | 手工填写 | 视后端 | one-api / new-api 等中转 |
+
+各家 Base URL 与模型清单均按官方文档逐字符核对；新增厂商只需在 `internal/config/providers.go` 预设表中加一行。
 
 ## 快速开始
 
 ```powershell
-# 1. 构建（需要 Go 1.27+；本仓库自带 .toolchain\go 时可省略安装）
+# 构建（需要 Go 1.27+；仓库自带 .toolchain\go 时可省略安装）
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 
-# 2. 运行
+# 运行
 dist\MCP点检助手.exe
 ```
 
-启动后：选择服务商 → 填写 API Key → 保存 → 选择工作区文件夹 → 加载 `mcp.json` → 输入点检指令。
+使用四步：**选服务商 → 填 API Key → 保存** → **选择工作区文件夹** → **加载 `mcp.json`** → 输入点检指令（Enter 发送，Shift+Enter 换行）。
 
-## 多服务商设计（最小侵入）
+`mcp.json` 格式与 Cursor 相同，例如：
 
-单一 OpenAI 兼容客户端不变，新增厂商只需在 `internal/config/providers.go` 的预设表中加一行：
+```json
+{
+  "mcpServers": {
+    "dianjian": {
+      "url": "http://192.168.1.10:3000/mcp",
+      "headers": { "Authorization": "Bearer your-token" }
+    }
+  }
+}
+```
 
-| 字段 | 作用 |
-| --- | --- |
-| `BaseURL` / `Models` | 界面下拉的地址默认值与模型候选（仍可手工填写） |
-| `Tools` (`full`/`partial`/`none`) + 说明 | 界面提示该厂商工具调用支持度 |
-| `ModelsAPI` | `GET {base_url}/models` 是否可用（决定「获取」按钮的预期） |
-| `NeedsKey` / `SendToolChoice` | 能力降级：Ollama 允许空 Key、不下发 `tool_choice` |
-| `ExtraBody` | 厂商私有参数，合并进请求体：星火 `tool_calls_switch=true`、硅基流动 `enable_thinking=false` |
+命令行参数：`--headless "指令"`（无界面跑一条指令）、`--serve`（仅起本地服务）、`--port N`（固定端口）、`--config 路径`。
 
-- `/api/providers` 是界面下拉的唯一数据源（Go 表 → JSON → `<select>`），前后端不重复维护
-- `Config.Provider` 记录选择；旧版 config.json 没有该字段时按 `base_url` 反推（`InferProvider`）
-- `reasoning_content` 作为 `llm.Message` 的一等字段持久化：DeepSeek / Kimi / 硅基流动在带 `tools` 的多轮对话中要求原样回传，否则接口报错
-- 已停用的模型 ID 自动迁移（`deepseek-chat` / `deepseek-reasoner` → `deepseek-flash`），保证存量配置继续可用
-- `tool_choice` 固定下发 `auto`：GLM 只接受 `auto`，Kimi k2.x 只接受 `auto/none`，均兼容
-
-## 架构
+## 项目结构
 
 ```
 main.go                 入口：GUI / --headless / --serve / --port / --config
@@ -50,66 +75,45 @@ main_windows.go         WebView2 窗口、控制台隐藏、浏览器兜底
 internal/
   config/               config.json / mcp.json 读写（兼容 UTF-8 BOM）+ 服务商预设表
   mcp/                  MCP 客户端（Streamable HTTP + SSE）与连接管理器
-  llm/                  OpenAI 兼容客户端（始终流式、工具调用聚合、reasoning_content 回传）
+  llm/                  OpenAI 兼容客户端（流式、工具调用聚合、reasoning_content 回传）
   chat/                 会话编排：系统提示（含工作区）→ LLM ⇄ MCP 循环（≤8 轮）
   i18n/                 中英文案表（Go 侧字符串）
   app/                  HTTP API + SSE 推送 + go:embed 嵌入式单页 UI
 cmd/mock/               开发用 Mock：假 DeepSeek（:9811）+ 假 MCP（:9812）
-tools/
-  icon/                 SVG → 多尺寸 ICO 工具（构建期生成应用图标）
-  peicon/               PE 资源检查器：验证 exe 是否嵌入图标
+tools/icon/             SVG → 多尺寸 ICO（构建期生成应用图标）
+tools/peicon/           PE 资源检查器：验证 exe 是否嵌入图标
 ```
 
 数据流：`WebView2/浏览器 → http://127.0.0.1:PORT → REST/SSE → chat.Session → (llm ⇄ mcp.Manager)`
 
-- LLM 侧：`POST {base_url}/chat/completions`，`stream:true`，工具来自 MCP `tools/list` 的 schema
-- MCP 侧：`initialize`（协议版本 `2025-06-18` → `2025-03-26` → `2024-11-05` 依次回退）→ `notifications/initialized` → `tools/list` / `tools/call`
-- 多服务器工具重名时以 `name@server` 区分
-
-## 界面与主题
-
-- 三栏布局，右侧面板宽度可拖拽（260–窗口宽-460，localStorage 记忆，双击恢复默认）
-- 主题：`:root` 定义全部颜色变量，`body.dark` 只覆盖变量；新增样式只需在两边给变量赋值
-- 语言：Go 侧 `internal/i18n`，前端 `app.js` 的 `I18N` 字典 + `data-i18n` / `data-i18n-title` / `data-i18n-ph` 标注；`go test` 会校验两套文案 key 一致、HTML 引用的 key 都存在
-
-## 开发与测试
+## 测试
 
 ```powershell
-$env:Path = ".toolchain\go\bin;$env:Path"     # 自带工具链；或使用系统 Go
-$env:GOPROXY = "https://goproxy.cn,direct"    # 国内网络
+$env:Path = ".toolchain\go\bin;$env:Path"
+$env:GOPROXY = "https://goproxy.cn,direct"
 go vet ./...
-go test ./...                                 # 单元 + 集成（httptest 假 MCP / 假 DeepSeek）
-node dist\gen_panel_test.js                   # 生成前端逻辑测试（含 i18n/主题/服务商用例）
-node "$env:TEMP\paneltest.js"                 # 运行之
+go test ./...                                  # 单元 + 集成（httptest 假 MCP / 假 DeepSeek）
+node dist\gen_panel_test.js                    # 生成前端逻辑测试
+node "$env:TEMP\paneltest.js"                  # 运行（i18n / 主题 / 服务商 / 面板 / 拖拽）
 ```
 
-覆盖的关键回归：厂商预设表完整性与 base_url 逐字符核对、i18n 文案完备、`/api/providers`、配置往返与非法值忽略、`reasoning_content` 回传、`ExtraBody` 下发、Ollama 降级、右侧面板结构与拖拽、深浅色只用变量。
-
-用真实二进制做端到端验证（无需真实 API Key）：
+无需真实 API Key 的端到端验证：
 
 ```powershell
-.\dist\mock.exe &                              # 启动 Mock DeepSeek + Mock MCP
+.\dist\mock.exe &
 .\dist\MCP点检助手.exe --headless "请点检工作区" --config .\dist\e2e\config.json
-.\dist\MCP点检助手.exe --serve                   # 仅起本地服务，便于 curl 调试
 ```
 
-## 构建
-
-`build.ps1`：图标生成（SVG → ICO → rsrc.syso）+ `go vet` + `go test ./...` + 前端逻辑测试（有 node 才跑）+ `go build -ldflags="-s -w"` → `dist\MCP点检助手.exe`（含 `cmd/mock`）。产物约 7.9 MB。
-（脚本内含中文，需以 `powershell -ExecutionPolicy Bypass -File .\build.ps1` 方式运行；Windows PowerShell 5.1 不会直接执行未签名的 .ps1。）
-
-发布给同事时只需拷贝 **`dist\MCP点检助手.exe`**（或连同 `mcp.json.example` 改名后的 `mcp.json`），无需安装任何运行时。
-
-### 应用图标
-
-- 源文件：`tools/icon/mcp-icon.svg`（600×600 单色 logo）
-- `build.ps1` 中 `tools/icon` 用 `tdewolff/canvas` 把它栅格化为 8 个尺寸（16/20/24/32/40/48/64/256）并打包成 `internal/app/icon.ico`，再由 `akavel/rsrc` 生成 `rsrc_windows_amd64.syso` 嵌入 exe（Go 链接器自动识别同目录 `*.syso`）
-- `main_windows.go` 中 `IconId: 1` 对应 rsrc 分配的第一个 RT_GROUP_ICON 资源 ID，WebView2 窗口与任务栏即显示该图标
-- 验证嵌入结果：`go run ./tools/peicon <exe>`（解析 PE 资源目录，列出图标组与全部尺寸）
+覆盖的关键回归：厂商预设表完整性与 Base URL 逐字符核对、i18n 文案完备、`/api/providers`、配置往返与非法值忽略、`reasoning_content` 多轮回传、厂商私有参数下发、Ollama 能力降级、右侧面板结构与宽度拖拽。
 
 ## 已知边界
 
 - MCP `command`（stdio）类型不支持：桌面极简版不含 Node/Python 运行时，界面明确标注。
-- 多步/并行工具调用不保证：编排循环最多 8 轮，单步结果不满意可继续对话。
-- 各厂商模型能力差异由预设表标注；模型迭代快，「获取」按钮拉到的列表以服务商实时返回为准。
+- 多步 / 并行工具调用不保证：编排循环最多 8 轮，单步结果不满意可继续对话。
+- 模型迭代快，「获取」按钮拉到的列表以服务商实时返回为准；部分厂商没有模型列表接口，工具会提示手工填写。
 - 未做代码签名：首次运行会有 SmartScreen 提示（点「更多信息」→「仍要运行」）。
+
+## 相关文档
+
+- [使用说明.md](使用说明.md) —— 面向使用者
+- [README_EN.md](README_EN.md) —— English
