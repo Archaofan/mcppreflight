@@ -40,6 +40,15 @@ Write-Host "==> go test ./..."
 & go test ./... -timeout 180s
 if ($LASTEXITCODE -ne 0) { Write-Error "测试失败"; exit 1 }
 
+Write-Host "==> 前端逻辑测试（需要 node，可选）"
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    & node (Join-Path $root "dist\gen_panel_test.js") | Out-Null
+    & node (Join-Path $env:TEMP "paneltest.js")
+    if ($LASTEXITCODE -ne 0) { Write-Warning "前端逻辑测试未全部通过" }
+} else {
+    Write-Host "未安装 node，跳过前端逻辑测试"
+}
+
 Write-Host "==> 构建主程序"
 & go build -ldflags="-s -w" -o (Join-Path $dist "MCP点检助手.exe") .
 if ($LASTEXITCODE -ne 0) { Write-Error "构建失败"; exit 1 }

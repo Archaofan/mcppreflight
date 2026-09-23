@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"mcpcheck/internal/config"
+	"mcppreflight/internal/config"
 )
 
 // ServerState 是一个 MCP 服务器的运行时状态（供 UI 展示）。

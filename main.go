@@ -11,10 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mcpcheck/internal/app"
-	"mcpcheck/internal/chat"
-	"mcpcheck/internal/config"
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/app"
+	"mcppreflight/internal/chat"
+	"mcppreflight/internal/config"
+	"mcppreflight/internal/i18n"
+	"mcppreflight/internal/mcp"
 )
 
 var (
@@ -27,7 +28,7 @@ var (
 func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
-	log.SetPrefix("[mcpcheck] ")
+	log.SetPrefix("[mcppreflight] ")
 
 	cfgPath := *flagConfig
 	if cfgPath == "" {
@@ -58,6 +59,9 @@ func main() {
 	}
 	session := chat.New(cfg, manager)
 	server := app.New(cfg, cfgPath, manager, session)
+	if *flagPort > 0 && *flagPort < 65536 {
+		server.Addr = fmt.Sprintf("127.0.0.1:%d", *flagPort)
+	}
 
 	switch {
 	case *flagHeadless != "":
@@ -101,32 +105,33 @@ func runGUI(server *app.Server) {
 }
 
 func runHeadless(session *chat.Session, message string) {
-	fmt.Println("=== MCP点检助手 · 无头模式 ===")
-	fmt.Printf("指令: %s\n\n", message)
+	lang := i18n.Normalize(session.Lang())
+	fmt.Println(i18n.T(lang, "headless_title"))
+	fmt.Printf(i18n.T(lang, "headless_command")+"\n\n", message)
 	err := session.Send(context.Background(), message, func(ev chat.Event) {
 		switch ev.Type {
 		case "assistant_delta":
 			fmt.Print(ev.Text)
 		case "tool_call":
-			fmt.Printf("\n>>> 调用工具 [%s] 参数: %s\n", ev.Name, ev.Args)
+			fmt.Printf(i18n.T(lang, "headless_tool_call"), ev.Name, ev.Args)
 		case "tool_result":
-			fmt.Printf("<<< 工具返回 [%s]:\n%s\n", ev.Name, truncateForPrint(ev.Text))
+			fmt.Printf(i18n.T(lang, "headless_tool_result"), ev.Name, truncateForPrint(ev.Text, lang))
 		case "error":
-			fmt.Printf("\n[错误] %s\n", ev.Text)
+			fmt.Printf(i18n.T(lang, "headless_error"), ev.Text)
 		case "done":
-			fmt.Println("\n=== 完成 ===")
+			fmt.Println(i18n.T(lang, "headless_done"))
 		}
 	})
 	if err != nil {
-		fmt.Printf("\n[失败] %v\n", err)
+		fmt.Printf(i18n.T(lang, "headless_failed"), err)
 		os.Exit(1)
 	}
 }
 
-func truncateForPrint(s string) string {
+func truncateForPrint(s string, lang i18n.Lang) string {
 	r := []rune(s)
 	if len(r) > 3000 {
-		return string(r[:3000]) + fmt.Sprintf("\n…（控制台展示截断，完整内容共 %d 字；图形界面中可完整查看）", len(r))
+		return string(r[:3000]) + fmt.Sprintf(i18n.T(lang, "headless_console_truncated"), len(r))
 	}
 	return s
 }
@@ -134,10 +139,10 @@ func truncateForPrint(s string) string {
 func setupLogFile(cfgPath string) {
 	// 日志优先写 exe 目录；不可写时退回临时目录
 	dir := filepath.Dir(cfgPath)
-	logPath := filepath.Join(dir, "mcpcheck.log")
+	logPath := filepath.Join(dir, "mcppreflight.log")
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		tmp := filepath.Join(os.TempDir(), "mcpcheck.log")
+		tmp := filepath.Join(os.TempDir(), "mcppreflight.log")
 		f, err = os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			return

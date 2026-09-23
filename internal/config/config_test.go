@@ -15,8 +15,11 @@ func TestLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.BaseURL != "https://api.deepseek.com" || c.Model != "deepseek-chat" {
+	if c.BaseURL != "https://api.deepseek.com" || c.Model != "deepseek-flash" {
 		t.Fatalf("默认值不符合预期: %+v", c)
+	}
+	if c.Provider != "deepseek" || c.Lang != "zh-CN" || c.Theme != "light" {
+		t.Fatalf("新增字段默认值不符合预期: %+v", c)
 	}
 
 	c.APIKey = "sk-test"

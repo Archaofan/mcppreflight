@@ -16,10 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"mcpcheck/internal/chat"
-	"mcpcheck/internal/config"
-	"mcpcheck/internal/llm"
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/chat"
+	"mcppreflight/internal/config"
+	"mcppreflight/internal/i18n"
+	"mcppreflight/internal/llm"
+	"mcppreflight/internal/mcp"
 )
 
 //go:embed assets
@@ -61,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	})
 
 	mux.HandleFunc("/api/config", s.handleConfig)
+	mux.HandleFunc("/api/providers", s.handleProviders)
 	mux.HandleFunc("/api/servers", s.handleServers)
 	mux.HandleFunc("/api/servers/reload", s.handleServersReload)
 	mux.HandleFunc("/api/pick-folder", s.handlePickFolder)
@@ -78,7 +80,11 @@ func (s *Server) Start() error {
 	if s.started {
 		return nil
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	addr := s.Addr
+	if addr == "" {
+		addr = "127.0.0.1:0" // 0 = 由系统自动选择空闲端口
+	}
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -110,22 +116,31 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, map[string]interface{}{
 			"ok":         true,
+			"provider":   s.Cfg.Provider,
 			"base_url":   s.Cfg.BaseURL,
 			"api_key":    s.Cfg.APIKey,
 			"model":      s.Cfg.Model,
 			"workspace":  s.Cfg.Workspace,
 			"mcp_config": s.Cfg.MCPConfig,
+			"lang":       s.Cfg.Lang,
+			"theme":      s.Cfg.Theme,
 		})
 	case http.MethodPost:
 		var body struct {
+			Provider  string `json:"provider"`
 			BaseURL   string `json:"base_url"`
 			APIKey    string `json:"api_key"`
 			Model     string `json:"model"`
 			MCPConfig string `json:"mcp_config"`
+			Lang      string `json:"lang"`
+			Theme     string `json:"theme"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, map[string]interface{}{"ok": false, "error": "请求体不是合法 JSON"})
+			writeJSON(w, map[string]interface{}{"ok": false, "error": i18n.T(s.lang(), "invalid_json_body")})
 			return
+		}
+		if p := strings.TrimSpace(body.Provider); p != "" && config.ProviderByID(p) != nil {
+			s.Cfg.Provider = p
 		}
 		if strings.TrimSpace(body.BaseURL) != "" {
 			s.Cfg.BaseURL = strings.TrimRight(strings.TrimSpace(body.BaseURL), "/")
@@ -134,14 +149,20 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			s.Cfg.APIKey = strings.TrimSpace(body.APIKey)
 		}
 		if strings.TrimSpace(body.Model) != "" {
-			s.Cfg.Model = strings.TrimSpace(body.Model)
+			s.Cfg.Model = config.MigrateModel(strings.TrimSpace(body.Model))
 		}
 		oldMCP := s.Cfg.MCPConfig
 		if strings.TrimSpace(body.MCPConfig) != "" {
 			s.Cfg.MCPConfig = strings.TrimSpace(body.MCPConfig)
 		}
+		if l := strings.TrimSpace(body.Lang); l != "" {
+			s.Cfg.Lang = string(i18n.Normalize(l))
+		}
+		if th := strings.TrimSpace(body.Theme); th == "dark" || th == "light" {
+			s.Cfg.Theme = th
+		}
 		if err := s.Cfg.Save(s.CfgPath); err != nil {
-			writeJSON(w, map[string]interface{}{"ok": false, "error": "保存配置失败: " + err.Error()})
+			writeJSON(w, map[string]interface{}{"ok": false, "error": i18n.T(s.lang(), "save_config_failed") + err.Error()})
 			return
 		}
 		resp := map[string]interface{}{"ok": true}
@@ -156,6 +177,18 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
+
+// handleProviders 返回内置服务商预设（界面下拉的唯一数据源）。
+func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "providers": config.Providers()})
+}
+
+// lang 返回当前界面语言。
+func (s *Server) lang() i18n.Lang { return i18n.Normalize(s.Cfg.Lang) }
 
 func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]interface{}{
@@ -193,7 +226,7 @@ func (s *Server) handlePickFolder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	path, err := pickFolder()
+	path, err := s.pickFolderLocalized()
 	if err != nil {
 		writeJSON(w, map[string]interface{}{"ok": false, "error": err.Error()})
 		return
@@ -208,11 +241,14 @@ func (s *Server) handlePickFolder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
-	if s.Cfg.APIKey == "" {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": "请先填写并保存 API Key"})
+	if s.Cfg.APIKey == "" && s.providerNeedsKey() {
+		writeJSON(w, map[string]interface{}{"ok": false, "error": i18n.T(s.lang(), "need_api_key_first")})
 		return
 	}
 	c := llm.NewClient(s.Cfg.BaseURL, s.Cfg.APIKey, s.Cfg.Model)
+	if p := config.ProviderByID(s.Cfg.Provider); p != nil && len(p.ExtraBody) > 0 {
+		c.WithExtra(p.ExtraBody)
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	models, err := c.ListModels(ctx)
@@ -221,6 +257,14 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]interface{}{"ok": true, "models": models})
+}
+
+// providerNeedsKey 判断当前服务商是否必须提供 API Key（本地 Ollama 可留空）。
+func (s *Server) providerNeedsKey() bool {
+	if p := config.ProviderByID(s.Cfg.Provider); p != nil {
+		return p.NeedsKey
+	}
+	return true
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -277,10 +321,19 @@ func (s *Server) SetQuitFunc(f func()) { s.quitFn = f }
 
 // pickFolder 打开 Windows 原生文件夹选择对话框。
 // 返回空字符串表示用户取消；出错时返回 error。
+func (s *Server) pickFolderLocalized() (string, error) {
+	desc := i18n.T(s.lang(), "pick_folder_desc")
+	return pickFolderWithDesc(desc)
+}
+
 func pickFolder() (string, error) {
+	return pickFolderWithDesc(i18n.T(i18n.ZH, "pick_folder_desc"))
+}
+
+func pickFolderWithDesc(desc string) (string, error) {
 	ps := `Add-Type -AssemblyName System.Windows.Forms;` +
 		`$f = New-Object System.Windows.Forms.FolderBrowserDialog;` +
-		`$f.Description = '请选择工作区文件夹（点检目标目录）';` +
+		`$f.Description = '` + desc + `';` +
 		`$f.ShowNewFolderButton = $false;` +
 		`if ($f.ShowDialog() -eq 'OK') { Write-Output $f.SelectedPath }`
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
@@ -290,7 +343,7 @@ func pickFolder() (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("选择文件夹超时")
+			return "", fmt.Errorf("%s", i18n.T(i18n.ZH, "pick_folder_timeout"))
 		}
 		// 用户取消时 PowerShell 正常退出但无输出，这里统一按无输出处理
 		return "", nil

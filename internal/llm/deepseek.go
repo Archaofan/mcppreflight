@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/mcp"
 )
 
 // Message 是一条对话消息（OpenAI 格式）。
@@ -22,6 +22,9 @@ type Message struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	// ReasoningContent 是思考内容。DeepSeek / Kimi / 硅基流动等在带 tools 的
+	// 多轮对话中要求原样回传，否则接口报错，因此必须作为一等字段存进历史。
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 }
 
 // ToolCall 是模型发起的一次工具调用。
@@ -54,6 +57,8 @@ type chatRequest struct {
 	Tools      []openAITool `json:"tools,omitempty"`
 	ToolChoice string       `json:"tool_choice,omitempty"`
 	Stream     bool         `json:"stream"`
+	// Extra 是厂商私有参数（不进 JSON 结构体，序列化时合并进请求体）
+	Extra map[string]interface{} `json:"-"`
 }
 
 type chatResponse struct {
@@ -69,9 +74,10 @@ type chatResponse struct {
 type streamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Role      string `json:"role"`
-			Content   string `json:"content"`
-			ToolCalls []struct {
+			Role             string `json:"role"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
 				Index    int    `json:"index"`
 				ID       string `json:"id"`
 				Type     string `json:"type"`
@@ -93,7 +99,11 @@ type Client struct {
 	BaseURL string
 	APIKey  string
 	Model   string
-	HTTP    *http.Client
+	// Extra 是厂商私有附加参数（如星火 tool_calls_switch、硅基流动 enable_thinking）
+	Extra map[string]interface{}
+	// OmitToolChoice 为 true 时不下发 tool_choice（如 Ollama 不支持）
+	OmitToolChoice bool
+	HTTP           *http.Client
 }
 
 // NewClient 创建客户端。
@@ -104,6 +114,12 @@ func NewClient(baseURL, apiKey, model string) *Client {
 		Model:   model,
 		HTTP:    &http.Client{Timeout: 10 * time.Minute},
 	}
+}
+
+// WithExtra 设置厂商私有附加参数（链式调用）。
+func (c *Client) WithExtra(extra map[string]interface{}) *Client {
+	c.Extra = extra
+	return c
 }
 
 func (c *Client) endpoint() string {
@@ -134,20 +150,37 @@ func BuildTools(mcpTools []mcp.Tool) []openAITool {
 }
 
 // ChatStream 发送一轮对话（流式）。onDelta 在收到内容增量时回调。
-// 返回的 Message 包含完整的 content 与 tool_calls（如有）。
+// 返回的 Message 包含完整的 content、reasoning_content 与 tool_calls（如有）。
 func (c *Client) ChatStream(ctx context.Context, msgs []Message, mcpTools []mcp.Tool, onDelta func(string)) (*Message, error) {
 	body := chatRequest{
 		Model:    c.Model,
 		Messages: msgs,
 		Tools:    BuildTools(mcpTools),
 		Stream:   true,
+		Extra:    c.Extra,
 	}
-	if len(mcpTools) > 0 {
+	if len(mcpTools) > 0 && !c.OmitToolChoice {
 		body.ToolChoice = "auto"
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
+	}
+	// 合并厂商私有参数（Extra 优先，不覆盖结构体字段）
+	if len(c.Extra) > 0 {
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(payload, &m); err == nil {
+			for k, v := range c.Extra {
+				b, err := json.Marshal(v)
+				if err != nil {
+					continue
+				}
+				m[k] = b
+			}
+			if merged, err := json.Marshal(m); err == nil {
+				payload = merged
+			}
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint(), bytes.NewReader(payload))
 	if err != nil {
@@ -155,7 +188,12 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Message, mcpTools []mcp.
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	// 本地 Ollama 等服务允许空 Key（其忽略该值），此处补占位符避免被中间层拒绝
+	key := c.APIKey
+	if key == "" {
+		key = "ollama"
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
@@ -194,6 +232,9 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Message, mcpTools []mcp.
 		}
 		for _, choice := range ch.Choices {
 			d := choice.Delta
+			if d.ReasoningContent != "" {
+				out.ReasoningContent += d.ReasoningContent
+			}
 			if d.Content != "" {
 				out.Content += d.Content
 				if onDelta != nil {

@@ -1,7 +1,10 @@
+/* MCP Preflight（MCP点检助手）界面样式：浅色为默认，暗色由 body.dark 覆盖变量 */
 :root {
   --bg: #f5f6f8;
   --panel: #ffffff;
+  --panel-2: #fafbfc;
   --border: #e3e6ea;
+  --border-strong: #c9d1dc;
   --text: #1f2329;
   --muted: #8a919c;
   --accent: #2f6bff;
@@ -9,12 +12,51 @@
   --ok: #22a06b;
   --err: #d94848;
   --warn: #d98e04;
+  --input-bg: #ffffff;
+  --hover-bg: #fafbfc;
+  --code-bg: #f0f2f5;
+  --pre-bg: #f6f8fa;
+  --tool-bg: #f2f4f7;
+  --mark-bg: #eef1f5;
+  --pre-in-block: rgba(255, 255, 255, .78);
+  /* 参数 / 返回 / 失败 三个浅色块 */
+  --args-bg: #fffaf0; --args-border: #f0d9a8; --args-lab: #8a6d1f;
+  --res-bg: #f4fbf7;  --res-border: #cfe6d8;  --res-lab: #1d6b45;
+  --fail-bg: #fdf3f3; --fail-border: #f2c9c9; --fail-lab: #d94848;
 }
+
+/* 暗色主题：仅覆盖变量，规则不变（后续加新样式只需在两边给变量赋值） */
+body.dark {
+  --bg: #16181d;
+  --panel: #1f2228;
+  --panel-2: #262a31;
+  --border: #343a44;
+  --border-strong: #454d5a;
+  --text: #e6e8eb;
+  --muted: #9aa3af;
+  --accent: #4d82ff;
+  --accent-dark: #3a6be0;
+  --ok: #3fb950;
+  --err: #f85149;
+  --warn: #d29922;
+  --input-bg: #12151a;
+  --hover-bg: #2a2f37;
+  --code-bg: #262b33;
+  --pre-bg: #12151a;
+  --tool-bg: #262b33;
+  --mark-bg: #2a2f37;
+  --pre-in-block: rgba(0, 0, 0, .28);
+  --args-bg: #2b2410; --args-border: #5c4a1f; --args-lab: #e3b341;
+  --res-bg: #10261a;  --res-border: #1f5138;  --res-lab: #3fb950;
+  --fail-bg: #2a1517; --fail-border: #6e2b2b; --fail-lab: #f85149;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app { height: 100%; }
 body {
   font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
   background: var(--bg); color: var(--text); font-size: 14px;
+  transition: background-color .15s ease, color .15s ease;
 }
 #app { display: flex; height: 100%; }
 
@@ -26,24 +68,27 @@ body {
   display: flex; flex-direction: column; gap: 18px;
 }
 .brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; }
+.brand .sub { display: block; font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
 #sidebar section { display: flex; flex-direction: column; gap: 6px; }
 #sidebar h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
 #sidebar label { font-size: 12px; color: var(--muted); }
-input, textarea {
+input, textarea, select {
   width: 100%; padding: 7px 9px; font-size: 13px;
-  border: 1px solid var(--border); border-radius: 6px; background: #fff;
-  font-family: inherit;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg);
+  color: var(--text); font-family: inherit;
 }
-input:focus, textarea:focus { outline: 2px solid rgba(47,107,255,.25); border-color: var(--accent); }
+input:focus, textarea:focus, select:focus { outline: 2px solid rgba(47,107,255,.25); border-color: var(--accent); }
 .row { display: flex; gap: 6px; align-items: center; }
-.row input { flex: 1; min-width: 0; }
+.row input, .row select { flex: 1; min-width: 0; }
 .hint { font-size: 12px; color: var(--muted); word-break: break-all; line-height: 1.5; }
+/* 服务商提示语为多行文本（工具调用支持度 + 说明 + Key 提示） */
+#provider-note { white-space: pre-line; word-break: break-word; }
 button {
   padding: 7px 12px; font-size: 13px; border: 1px solid var(--border);
-  border-radius: 6px; background: #fff; color: var(--text); cursor: pointer;
+  border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer;
   font-family: inherit; white-space: nowrap;
 }
-button:hover { border-color: #c9d1dc; background: #fafbfc; }
+button:hover { border-color: var(--border-strong); background: var(--hover-bg); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.primary:hover { background: var(--accent-dark); }
 button.mini { padding: 7px 10px; }
@@ -51,7 +96,7 @@ button.block { width: 100%; }
 button:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ---------- 服务器列表 ---------- */
-.server { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: #fff; }
+.server { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
 .server .head { display: flex; align-items: center; gap: 7px; cursor: pointer; }
 .server .name { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
@@ -62,7 +107,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .server .err { font-size: 12px; color: var(--err); margin-top: 4px; word-break: break-all; }
 .server .tools { margin-top: 6px; display: none; flex-direction: column; gap: 4px; }
 .server .tools.open { display: flex; }
-.tool { font-size: 12px; background: #f2f4f7; border-radius: 5px; padding: 5px 8px; }
+.tool { font-size: 12px; background: var(--tool-bg); border-radius: 5px; padding: 5px 8px; }
 .tool b { color: var(--accent-dark); }
 .tool .desc { color: var(--muted); display: block; margin-top: 2px; white-space: pre-wrap; }
 .empty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
@@ -101,10 +146,10 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .panel-title { font-size: 13px; font-weight: 700; flex: 1; }
 .panel-head .mini { padding: 3px 9px; font-size: 12px; }
 #mcp-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.tcall { border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.tcall { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
 .tcall-head {
   display: flex; align-items: center; gap: 7px; padding: 8px 10px;
-  background: #fafbfc; border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0;
+  background: var(--panel-2); border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0;
 }
 .tcall-head .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--warn); }
 .tcall-head .dot.ok { background: var(--ok); }
@@ -118,17 +163,17 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 
 /* 参数 / 返回 浅色块（沿用早期配色，便于一眼区分） */
 .tcall .block { border-radius: 7px; padding: 7px 10px 9px; margin: 8px 10px; border: 1px solid var(--border); }
-.tcall .block.args { background: #fffaf0; border-color: #f0d9a8; }
-.tcall .block.result { background: #f4fbf7; border-color: #cfe6d8; }
-.tcall .block.result.failed { background: #fdf3f3; border-color: #f2c9c9; }
+.tcall .block.args { background: var(--args-bg); border-color: var(--args-border); }
+.tcall .block.result { background: var(--res-bg); border-color: var(--res-border); }
+.tcall .block.result.failed { background: var(--fail-bg); border-color: var(--fail-border); }
 .tcall .block .lab { font-size: 11.5px; font-weight: 600; margin-bottom: 5px; }
-.tcall .block.args .lab { color: #8a6d1f; }
-.tcall .block.result .lab { color: #1d6b45; }
-.tcall .block.result.failed .lab { color: #d94848; }
+.tcall .block.args .lab { color: var(--args-lab); }
+.tcall .block.result .lab { color: var(--res-lab); }
+.tcall .block.result.failed .lab { color: var(--fail-lab); }
 .tcall .block .lab .len { font-weight: 400; margin-left: 5px; opacity: .85; }
 .tcall .block pre {
-  background: rgba(255, 255, 255, .78); border: 1px solid var(--border); border-radius: 6px;
-  padding: 7px 9px; font-size: 11.5px;
+  background: var(--pre-in-block); border: 1px solid var(--border); border-radius: 6px;
+  padding: 7px 9px; font-size: 11.5px; color: var(--text);
   max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all;
   font-family: Consolas, "Courier New", monospace;
 }
@@ -147,7 +192,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 /* 中间对话流里的轻量提示（详情在右侧） */
 .toolmark {
   align-self: center; font-size: 11.5px; color: var(--muted);
-  background: #eef1f5; border-radius: 10px; padding: 2px 10px;
+  background: var(--mark-bg); border-radius: 10px; padding: 2px 10px;
 }
 
 /* markdown 渲染 */
@@ -155,8 +200,8 @@ body.resizing { user-select: none; cursor: col-resize; }
 .md h1 { font-size: 18px; } .md h2 { font-size: 16px; } .md h3 { font-size: 15px; }
 .md p { margin: 6px 0; line-height: 1.65; }
 .md ul, .md ol { margin: 6px 0 6px 22px; line-height: 1.65; }
-.md code { background: #f0f2f5; border-radius: 4px; padding: 1px 5px; font-family: Consolas, monospace; font-size: 12.5px; }
-.md pre { background: #f6f8fa; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow: auto; margin: 8px 0; }
+.md code { background: var(--code-bg); border-radius: 4px; padding: 1px 5px; font-family: Consolas, monospace; font-size: 12.5px; }
+.md pre { background: var(--pre-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow: auto; margin: 8px 0; }
 .md pre code { background: none; padding: 0; }
 .md blockquote { border-left: 3px solid var(--border); margin: 6px 0; padding: 2px 12px; color: var(--muted); }
 .md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }

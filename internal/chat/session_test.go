@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"mcpcheck/internal/config"
-	"mcpcheck/internal/llm"
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/config"
+	"mcppreflight/internal/llm"
+	"mcppreflight/internal/mcp"
 )
 
 // newFakeMCP 返回一个模拟 MCP Streamable HTTP 服务器（scan_project 工具）。

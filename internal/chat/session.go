@@ -8,9 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"mcpcheck/internal/config"
-	"mcpcheck/internal/llm"
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/config"
+	"mcppreflight/internal/i18n"
+	"mcppreflight/internal/llm"
+	"mcppreflight/internal/mcp"
 )
 
 const (
@@ -57,15 +58,34 @@ func (s *Session) Reset() {
 	s.history = nil
 }
 
-// SystemPrompt 根据当前配置生成系统提示。
+// SystemPrompt 根据当前配置生成系统提示（语言随界面语言切换）。
 func (s *Session) SystemPrompt() string {
+	lang := s.lang()
 	var b strings.Builder
-	b.WriteString("你是「MCP点检助手」，运行在用户本机。你的任务是通过 MCP 工具帮助用户对软件工程目录执行点检，并输出中文点检报告（Markdown 格式）。\n")
+	b.WriteString(i18n.T(lang, "sys_intro"))
 	if s.cfg.Workspace != "" {
-		b.WriteString("当前工作目录（工作区）为：" + s.cfg.Workspace + " 。当工具需要软件工程目录/路径参数时，默认使用该工作区路径，除非用户明确指定了其他路径。\n")
+		b.WriteString(fmt.Sprintf(i18n.T(lang, "sys_workspace"), s.cfg.Workspace))
 	}
-	b.WriteString("规则：1) 需要点检时调用相应 MCP 工具，不要臆造点检结果；2) 工具返回后，基于真实返回内容整理成结构化报告（问题清单、风险等级、修复建议）；3) 工具调用失败时如实说明错误信息。")
+	b.WriteString(i18n.T(lang, "sys_rules"))
 	return b.String()
+}
+
+// lang 返回当前界面语言。
+func (s *Session) lang() i18n.Lang { return i18n.Normalize(s.cfg.Lang) }
+
+// Lang 导出当前界面语言标识（供无头模式等外部使用）。
+func (s *Session) Lang() string { return string(s.lang()) }
+
+// newClient 按当前服务商预设创建客户端（带上厂商私有参数与能力降级）。
+func (s *Session) newClient() *llm.Client {
+	c := llm.NewClient(s.cfg.BaseURL, s.cfg.APIKey, s.cfg.Model)
+	if p := config.ProviderByID(s.cfg.Provider); p != nil {
+		if len(p.ExtraBody) > 0 {
+			c.WithExtra(p.ExtraBody)
+		}
+		c.OmitToolChoice = !p.SendToolChoice
+	}
+	return c
 }
 
 func (s *Session) messages() []llm.Message {
@@ -80,18 +100,18 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.cfg.APIKey == "" {
-		err := fmt.Errorf("尚未配置 API Key，请先在左侧「模型设置」中填写")
+	if s.cfg.APIKey == "" && s.providerNeedsKey() {
+		err := fmt.Errorf("%s", i18n.T(s.lang(), "err_no_api_key"))
 		emit(Event{Type: "error", Text: err.Error()})
 		return err
 	}
 	if s.mcpMgr.ConnectedCount() == 0 {
-		emit(Event{Type: "error", Text: "当前没有已连接的 MCP 服务器，请检查 mcp.json 配置后点击「重新加载」"})
+		emit(Event{Type: "error", Text: i18n.T(s.lang(), "err_no_mcp")})
 		return fmt.Errorf("没有已连接的 MCP 服务器")
 	}
 
 	s.history = append(s.history, llm.Message{Role: "user", Content: userText})
-	client := llm.NewClient(s.cfg.BaseURL, s.cfg.APIKey, s.cfg.Model)
+	client := s.newClient()
 
 	const maxRounds = 8
 	for round := 0; round < maxRounds; round++ {
@@ -112,8 +132,8 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 			emit(Event{Type: "done"})
 			return nil
 		}
-		// 记录助手消息（含工具调用）
-		asst := llm.Message{Role: "assistant", Content: resp.Content, ToolCalls: resp.ToolCalls}
+		// 记录助手消息（含工具调用与思考内容；后者在多轮工具调用中必须原样回传）
+		asst := llm.Message{Role: "assistant", Content: resp.Content, ToolCalls: resp.ToolCalls, ReasoningContent: resp.ReasoningContent}
 		s.history = append(s.history, asst)
 		for _, tc := range resp.ToolCalls {
 			if tc.Function.Name == "" {
@@ -127,7 +147,7 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 			result, err := s.mcpMgr.CallTool(ctx, tc.Function.Name, args)
 			failed := false
 			if err != nil {
-				result = "工具调用失败：" + err.Error()
+				result = i18n.T(s.lang(), "tool_failed_prefix") + err.Error()
 				failed = true
 			}
 			// 界面拿完整内容（可滚动/展开），LLM 侧按上限保护上下文
@@ -139,8 +159,16 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 			})
 		}
 	}
-	emit(Event{Type: "error", Text: "工具调用轮次过多，已停止。请尝试把需求描述得更具体。"})
+	emit(Event{Type: "error", Text: i18n.T(s.lang(), "err_too_many_rounds")})
 	return fmt.Errorf("工具调用轮次超过上限")
+}
+
+// providerNeedsKey 判断当前服务商是否必须提供 API Key（本地 Ollama 可留空）。
+func (s *Session) providerNeedsKey() bool {
+	if p := config.ProviderByID(s.cfg.Provider); p != nil {
+		return p.NeedsKey
+	}
+	return true
 }
 
 // trimHistory 在历史超过预算时，从最旧的工具结果开始省略内容，

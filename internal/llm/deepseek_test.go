@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"mcpcheck/internal/mcp"
+	"mcppreflight/internal/mcp"
 )
 
 // fakeDeepSeek 模拟 DeepSeek：第一轮返回 tool_call（SSE 增量），

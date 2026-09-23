@@ -8,18 +8,24 @@ import (
 
 // Config 是应用的本地配置（保存在 exe 同目录的 config.json）。
 type Config struct {
+	Provider  string `json:"provider"`   // 模型厂商预设 ID（deepseek / qwen / glm ...；custom = 自定义）
 	BaseURL   string `json:"base_url"`   // OpenAI 兼容 API 地址，默认 https://api.deepseek.com
 	APIKey    string `json:"api_key"`    // API Key（明文保存在本机 config.json）
-	Model     string `json:"model"`      // 模型名，如 deepseek-chat / deepseek-flash
+	Model     string `json:"model"`      // 模型名，如 deepseek-chat
 	Workspace string `json:"workspace"`  // 工作区文件夹（点检目标目录）
 	MCPConfig string `json:"mcp_config"` // mcp.json 路径（cursor 格式）
+	Lang      string `json:"lang"`       // 界面语言：zh-CN（默认）/ en
+	Theme     string `json:"theme"`      // 界面主题：light（默认）/ dark
 }
 
 // Default 返回默认配置。
 func Default() *Config {
 	return &Config{
-		BaseURL: "https://api.deepseek.com",
-		Model:   "deepseek-chat",
+		Provider: "deepseek",
+		BaseURL:  "https://api.deepseek.com",
+		Model:    "deepseek-flash",
+		Lang:     "zh-CN",
+		Theme:    "light",
 	}
 }
 
@@ -37,11 +43,23 @@ func Load(path string) (*Config, error) {
 	if err := json.Unmarshal(b, c); err != nil {
 		return nil, err
 	}
+	// 兼容旧版配置：缺省字段按默认值补齐，不改变用户已有选择
+	if c.Provider == "" {
+		c.Provider = InferProvider(c.BaseURL)
+	}
 	if c.BaseURL == "" {
 		c.BaseURL = "https://api.deepseek.com"
 	}
 	if c.Model == "" {
-		c.Model = "deepseek-chat"
+		c.Model = "deepseek-flash"
+	}
+	// 旧版配置里的已停用模型 ID 自动迁移（如 deepseek-chat → deepseek-flash）
+	c.Model = MigrateModel(c.Model)
+	if c.Lang == "" {
+		c.Lang = "zh-CN"
+	}
+	if c.Theme == "" {
+		c.Theme = "light"
 	}
 	return c, nil
 }

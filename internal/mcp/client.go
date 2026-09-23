@@ -166,7 +166,7 @@ func (c *Client) handshake(ctx context.Context, version string) error {
 	res, err := c.call(ctx, "initialize", map[string]interface{}{
 		"protocolVersion": version,
 		"capabilities":    map[string]interface{}{},
-		"clientInfo":      map[string]string{"name": "mcpcheck", "version": "1.0.0"},
+		"clientInfo":      map[string]string{"name": "mcppreflight", "version": "1.0.0"},
 	})
 	if err != nil {
 		return err
