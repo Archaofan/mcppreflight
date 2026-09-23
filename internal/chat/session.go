@@ -24,7 +24,7 @@ const (
 	// 超出后从最旧的工具结果开始省略，避免多轮点检累积爆上下文。
 	historyBudget = 40000
 	// omittedToolResult 是历史修剪后的占位说明。
-	omittedToolResult = "（该条历史工具结果过长已省略，完整内容见上方聊天界面；如需重新获取可再次调用工具）"
+	omittedToolResult = "（该条历史工具结果过长已省略，完整内容见右侧「MCP 工具调用」面板；如需重新获取可再次调用工具）"
 )
 
 // Event 是推送给 UI 的对话事件。
@@ -33,6 +33,8 @@ type Event struct {
 	Text string `json:"text,omitempty"`
 	Name string `json:"name,omitempty"`
 	Args string `json:"args,omitempty"`
+	// Failed 标记 tool_result 是否为失败结果（供界面区分样式）
+	Failed bool `json:"failed,omitempty"`
 }
 
 // Session 维护一轮会话的对话历史。
@@ -123,11 +125,13 @@ func (s *Session) Send(ctx context.Context, userText string, emit func(Event)) e
 				args = json.RawMessage(tc.Function.Arguments)
 			}
 			result, err := s.mcpMgr.CallTool(ctx, tc.Function.Name, args)
+			failed := false
 			if err != nil {
 				result = "工具调用失败：" + err.Error()
+				failed = true
 			}
 			// 界面拿完整内容（可滚动/展开），LLM 侧按上限保护上下文
-			emit(Event{Type: "tool_result", Name: tc.Function.Name, Text: truncateRunes(result, displayToolResultLimit)})
+			emit(Event{Type: "tool_result", Name: tc.Function.Name, Text: truncateRunes(result, displayToolResultLimit), Failed: failed})
 			s.history = append(s.history, llm.Message{
 				Role:       "tool",
 				ToolCallID: tc.ID,

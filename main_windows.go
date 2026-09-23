@@ -29,8 +29,8 @@ func newWebView(url string) (w webview.WebView) {
 		Debug: false,
 		WindowOptions: webview.WindowOptions{
 			Title:  "MCP点检助手",
-			Width:  1180,
-			Height: 780,
+			Width:  1280,
+			Height: 820,
 			Center: true,
 		},
 	}

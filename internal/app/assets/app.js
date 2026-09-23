@@ -254,8 +254,13 @@
   $("btn-reset").addEventListener("click", function () {
     api("POST", "/api/reset").then(function () {
       $("chat").innerHTML = "";
+      resetToolPanel();
       addSys("已开始新会话");
     });
+  });
+
+  $("btn-clear-tools").addEventListener("click", function () {
+    resetToolPanel();
   });
 
   /* ---------------- 聊天区 ---------------- */
@@ -278,38 +283,107 @@
     return d.querySelector(".bubble");
   }
 
-  function addToolCard(kind, name, args, result) {
+  /* ---------- 右侧 MCP 工具调用面板 ---------- */
+  var toolQueue = {}; // 工具名 -> 待填结果的卡片数组
+
+  function scrollPanel() {
+    var el = $("mcp-log");
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  function resetToolPanel() {
+    var log = $("mcp-log");
+    log.innerHTML = "";
+    toolQueue = {};
+    var hint = document.createElement("div");
+    hint.id = "mcp-empty";
+    hint.className = "empty";
+    hint.textContent = "尚无工具调用";
+    log.appendChild(hint);
+  }
+
+  // 中间对话流里的轻量提示，避免打断 LLM 反馈的阅读
+  function addToolMarker(name) {
     var d = document.createElement("div");
-    d.className = "msg assistant";
-    var html = '<div class="role">助手</div>';
-    if (kind === "call") {
-      html += '<div class="toolcard"><span class="t">🔧 调用 MCP 工具：' + esc(name) + "</span><pre>" + esc(args || "{}") + "</pre></div>";
-      d.innerHTML = html;
-    } else {
-      html += '<div class="resultcard"><span class="t">📄 工具返回：' + esc(name) + '</span><span class="len"></span></div>';
-      d.innerHTML = html;
-      var card = d.querySelector(".resultcard");
-      var pre = document.createElement("pre");
-      pre.textContent = result || "";
-      card.appendChild(pre);
-      var len = (result || "").length;
-      if (len > 1200) {
-        pre.classList.add("clamped");
-        d.querySelector(".len").textContent = "（" + len + " 字）";
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "expand-btn";
-        btn.textContent = "展开全文";
-        btn.addEventListener("click", function () {
-          var open = pre.classList.toggle("open");
-          btn.textContent = open ? "收起" : "展开全文";
-          scrollBottom();
-        });
-        card.appendChild(btn);
-      }
-    }
+    d.className = "toolmark";
+    d.textContent = "🔧 调用了 " + name + "（详情见右侧）";
     chatEl.appendChild(d); scrollBottom();
-    return d;
+  }
+
+  function addToolCall(name, args) {
+    var empty = $("mcp-empty");
+    if (empty) empty.parentNode.removeChild(empty);
+    var d = document.createElement("div");
+    d.className = "tcall";
+    var head = document.createElement("div");
+    head.className = "tcall-head";
+    head.innerHTML = '<span class="dot"></span><span class="tname">' + esc(name) + '</span><span class="tstate">调用中…</span>';
+    d.appendChild(head);
+    if (args) {
+      var lab = document.createElement("div");
+      lab.className = "lab";
+      lab.textContent = "参数";
+      d.appendChild(lab);
+      var pre = document.createElement("pre");
+      pre.textContent = args;
+      d.appendChild(pre);
+    }
+    $("mcp-log").appendChild(d);
+    if (!toolQueue[name]) toolQueue[name] = [];
+    toolQueue[name].push(d);
+    scrollPanel();
+  }
+
+  function addToolResult(name, result, failed) {
+    var q = toolQueue[name];
+    var card = (q && q.length) ? q.shift() : null;
+    if (!card) {
+      // 没有配对的调用记录（异常情况）：单独建卡
+      var empty = $("mcp-empty");
+      if (empty) empty.parentNode.removeChild(empty);
+      card = document.createElement("div");
+      card.className = "tcall";
+      card.innerHTML = '<div class="tcall-head"><span class="dot"></span><span class="tname">' + esc(name) + '</span><span class="tstate"></span></div>';
+      $("mcp-log").appendChild(card);
+    }
+    var dot = card.querySelector(".dot");
+    var state = card.querySelector(".tstate");
+    if (failed) {
+      card.classList.add("failed");
+      dot.classList.add("error");
+      state.textContent = "失败";
+    } else {
+      dot.classList.add("ok");
+      state.textContent = "完成";
+    }
+    var lab = document.createElement("div");
+    lab.className = "lab";
+    lab.textContent = failed ? "错误" : "返回";
+    var len = (result || "").length;
+    if (len) {
+      var lenSpan = document.createElement("span");
+      lenSpan.className = "len";
+      lenSpan.textContent = "（" + len + " 字）";
+      lab.appendChild(lenSpan);
+    }
+    card.appendChild(lab);
+    var pre = document.createElement("pre");
+    pre.textContent = result || "";
+    card.appendChild(pre);
+    if (len > 1200) {
+      pre.classList.add("clamped");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "expand-btn";
+      btn.textContent = "展开全文";
+      btn.addEventListener("click", function () {
+        var open = pre.classList.toggle("open");
+        btn.textContent = open ? "收起" : "展开全文";
+        scrollPanel();
+      });
+      card.appendChild(btn);
+    }
+    scrollPanel();
   }
 
   function addSys(text, isError) {
@@ -370,9 +444,10 @@
           bubble.innerHTML = md(acc) + '<span class="typing"></span>';
           scrollBottom();
         } else if (payload.type === "tool_call") {
-          addToolCard("call", payload.name, payload.args);
+          addToolMarker(payload.name);
+          addToolCall(payload.name, payload.args);
         } else if (payload.type === "tool_result") {
-          addToolCard("result", payload.name, null, payload.text);
+          addToolResult(payload.name, payload.text, !!payload.failed);
         } else if (payload.type === "error") {
           addSys(payload.text || "发生错误", true);
         } else if (payload.type === "done") {
@@ -409,5 +484,5 @@
   /* ---------------- 初始化 ---------------- */
   loadConfig();
   loadServers();
-  addSys("欢迎使用 MCP点检助手：① 填写 DeepSeek API Key 并保存 → ② 选择工作区文件夹 → ③ 加载 mcp.json → ④ 输入点检指令");
+  addSys("欢迎使用 MCP点检助手：① 填写 DeepSeek API Key 并保存 → ② 选择工作区文件夹 → ③ 加载 mcp.json → ④ 输入点检指令。中间是对话与报告，右侧面板实时显示 MCP 工具调用参数与返回。");
 })();
