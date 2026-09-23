@@ -116,6 +116,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, map[string]interface{}{
 			"ok":         true,
+			"version":    Version,
 			"provider":   s.Cfg.Provider,
 			"base_url":   s.Cfg.BaseURL,
 			"api_key":    s.Cfg.APIKey,

@@ -23,12 +23,18 @@ var (
 	flagServe    = flag.Bool("serve", false, "仅启动本地服务（不打开窗口），用于调试")
 	flagPort     = flag.Int("port", 0, "固定端口（默认自动选择）")
 	flagConfig   = flag.String("config", "", "配置文件路径（默认 exe 同目录 config.json）")
+	flagVersion  = flag.Bool("version", false, "打印版本号后退出")
 )
 
 func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("[mcppreflight] ")
+
+	if *flagVersion {
+		fmt.Printf("mcppreflight %s\n", app.Version)
+		return
+	}
 
 	cfgPath := *flagConfig
 	if cfgPath == "" {
@@ -97,7 +103,7 @@ func runGUI(server *app.Server) {
 	}
 	server.SetQuitFunc(w.Terminate)
 	defer w.Destroy()
-	w.SetTitle("MCP点检助手")
+	w.SetTitle(fmt.Sprintf("MCP点检助手 v%s", app.Version))
 	w.SetSize(1180, 780, 0)
 	w.Navigate(url)
 	w.Run()

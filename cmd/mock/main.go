@@ -67,7 +67,7 @@ func main() {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.Header().Set("Cache-Control", "no-cache")
 			flusher := w.(http.Flusher)
-			argParts := []string{`{"path"`, `:"E:\\DSH-Workspace\\MCP-tool"}`}
+			argParts := []string{`{"path"`, `:"E:\\test"}`}
 			for i, part := range argParts {
 				chunk := map[string]interface{}{
 					"choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{

@@ -383,6 +383,9 @@
       $("ws-path").textContent = c.workspace ? c.workspace : t("ws_none");
       setTheme(state.theme, false);
       applyI18N();
+      // 品牌副标题带上版本号（如 mcppreflight v0.1.0）
+      var brand = $("brand-sub");
+      if (brand && c.version) brand.textContent = t("brand_sub") + " v" + c.version;
       renderProviderOptions();
       loadServers();
     });
