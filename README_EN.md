@@ -119,3 +119,7 @@ Key regressions covered: provider preset integrity and character-exact Base URLs
 
 - [使用说明.md](使用说明.md) — user guide (Chinese)
 - [README.md](README.md) — 简体中文
+
+## License
+
+[MIT](LICENSE) © 2026 Archaofan

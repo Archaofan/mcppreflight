@@ -117,3 +117,7 @@ node "$env:TEMP\paneltest.js"                  # 运行（i18n / 主题 / 服务
 
 - [使用说明.md](使用说明.md) —— 面向使用者
 - [README_EN.md](README_EN.md) —— English
+
+## 许可证
+
+[MIT](LICENSE) © 2026 Archaofan
