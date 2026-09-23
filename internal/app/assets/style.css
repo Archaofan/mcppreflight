@@ -90,7 +90,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ---------- 右侧 MCP 工具调用面板 ---------- */
 #mcp-panel {
-  width: 352px; min-width: 300px; height: 100%;
+  width: 352px; min-width: 260px; height: 100%;
   background: var(--panel); border-left: 1px solid var(--border);
   display: flex; flex-direction: column; overflow: hidden;
 }
@@ -115,17 +115,35 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 }
 .tcall .tstate { font-size: 11px; color: var(--muted); }
 .tcall.failed .tstate { color: var(--err); }
-.tcall .lab { font-size: 11px; color: var(--muted); margin: 8px 10px 3px; }
-.tcall .lab .len { margin-left: 5px; }
-.tcall pre {
-  background: #f6f8fa; border: 1px solid var(--border); border-radius: 6px;
-  padding: 7px 9px; margin: 0 10px 8px; font-size: 11.5px;
+
+/* 参数 / 返回 浅色块（沿用早期配色，便于一眼区分） */
+.tcall .block { border-radius: 7px; padding: 7px 10px 9px; margin: 8px 10px; border: 1px solid var(--border); }
+.tcall .block.args { background: #fffaf0; border-color: #f0d9a8; }
+.tcall .block.result { background: #f4fbf7; border-color: #cfe6d8; }
+.tcall .block.result.failed { background: #fdf3f3; border-color: #f2c9c9; }
+.tcall .block .lab { font-size: 11.5px; font-weight: 600; margin-bottom: 5px; }
+.tcall .block.args .lab { color: #8a6d1f; }
+.tcall .block.result .lab { color: #1d6b45; }
+.tcall .block.result.failed .lab { color: #d94848; }
+.tcall .block .lab .len { font-weight: 400; margin-left: 5px; opacity: .85; }
+.tcall .block pre {
+  background: rgba(255, 255, 255, .78); border: 1px solid var(--border); border-radius: 6px;
+  padding: 7px 9px; font-size: 11.5px;
   max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all;
   font-family: Consolas, "Courier New", monospace;
 }
-.tcall pre.clamped { max-height: 180px; overflow: auto; }
-.tcall pre.clamped.open { max-height: none; }
-.tcall .expand-btn { margin: 0 10px 8px; }
+.tcall .block pre.clamped { max-height: 170px; overflow: auto; }
+.tcall .block pre.clamped.open { max-height: none; }
+.tcall .block .expand-btn { margin-top: 6px; }
+
+/* 拖拽分隔条 */
+#panel-resizer {
+  width: 5px; min-width: 5px; cursor: col-resize;
+  background: transparent; border-left: 1px solid var(--border);
+}
+#panel-resizer:hover, #panel-resizer.active { background: rgba(47, 107, 255, .18); }
+body.resizing { user-select: none; cursor: col-resize; }
+
 /* 中间对话流里的轻量提示（详情在右侧） */
 .toolmark {
   align-self: center; font-size: 11.5px; color: var(--muted);
@@ -155,8 +173,3 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 #composer button { align-self: flex-end; padding: 8px 22px; }
 .typing { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-left: 3px; animation: blink 1s infinite; }
 @keyframes blink { 0%,100% { opacity: .2; } 50% { opacity: 1; } }
-
-/* 窄窗口时收窄右侧面板 */
-@media (max-width: 1280px) {
-  #mcp-panel { width: 300px; min-width: 280px; }
-}

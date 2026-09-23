@@ -320,13 +320,17 @@
     head.innerHTML = '<span class="dot"></span><span class="tname">' + esc(name) + '</span><span class="tstate">调用中…</span>';
     d.appendChild(head);
     if (args) {
+      // 参数：浅黄色块
+      var block = document.createElement("div");
+      block.className = "block args";
       var lab = document.createElement("div");
       lab.className = "lab";
       lab.textContent = "参数";
-      d.appendChild(lab);
+      block.appendChild(lab);
       var pre = document.createElement("pre");
       pre.textContent = args;
-      d.appendChild(pre);
+      block.appendChild(pre);
+      d.appendChild(block);
     }
     $("mcp-log").appendChild(d);
     if (!toolQueue[name]) toolQueue[name] = [];
@@ -356,6 +360,9 @@
       dot.classList.add("ok");
       state.textContent = "完成";
     }
+    // 返回：浅绿色块（失败为浅红色）
+    var block = document.createElement("div");
+    block.className = "block result" + (failed ? " failed" : "");
     var lab = document.createElement("div");
     lab.className = "lab";
     lab.textContent = failed ? "错误" : "返回";
@@ -366,10 +373,11 @@
       lenSpan.textContent = "（" + len + " 字）";
       lab.appendChild(lenSpan);
     }
-    card.appendChild(lab);
+    block.appendChild(lab);
     var pre = document.createElement("pre");
     pre.textContent = result || "";
-    card.appendChild(pre);
+    block.appendChild(pre);
+    card.appendChild(block);
     if (len > 1200) {
       pre.classList.add("clamped");
       var btn = document.createElement("button");
@@ -381,10 +389,55 @@
         btn.textContent = open ? "收起" : "展开全文";
         scrollPanel();
       });
-      card.appendChild(btn);
+      block.appendChild(btn);
     }
     scrollPanel();
   }
+
+  /* ---------- 右侧面板宽度拖拽 ---------- */
+  (function () {
+    var resizer = $("panel-resizer");
+    var panel = $("mcp-panel");
+    if (!resizer || !panel) return;
+    var KEY = "mcpcheck.panel-width";
+    var saved = null;
+    try { saved = window.localStorage ? window.localStorage.getItem(KEY) : null; } catch (e) { saved = null; }
+    if (saved) {
+      var w0 = parseInt(saved, 10);
+      if (w0 >= 260 && w0 <= 900) panel.style.width = w0 + "px";
+    }
+    var startX = 0, startW = 0, dragging = false;
+    resizer.addEventListener("mousedown", function (e) {
+      dragging = true;
+      startX = e.clientX;
+      startW = panel.offsetWidth || 352;
+      resizer.classList.add("active");
+      document.body.classList.add("resizing");
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      // 向左拖动 → 面板变宽
+      var w = startW + (startX - e.clientX);
+      var max = Math.max(280, (window.innerWidth || 1280) - 460);
+      w = Math.max(260, Math.min(max, w));
+      panel.style.width = w + "px";
+    });
+    document.addEventListener("mouseup", function () {
+      if (!dragging) return;
+      dragging = false;
+      resizer.classList.remove("active");
+      document.body.classList.remove("resizing");
+      try {
+        if (window.localStorage) window.localStorage.setItem(KEY, String(panel.offsetWidth));
+      } catch (e) { /* 忽略存储失败 */ }
+    });
+    // 双击恢复默认宽度
+    resizer.addEventListener("dblclick", function () {
+      panel.style.width = "";
+      try { if (window.localStorage) window.localStorage.removeItem(KEY); } catch (e) { /* 忽略 */ }
+    });
+  })();
 
   function addSys(text, isError) {
     var d = document.createElement("div");
