@@ -2,7 +2,9 @@
 
 **简体中文** ｜ [English](README_EN.md)
 
-极简 Windows 桌面工具：在聊天窗口里让大模型（默认 DeepSeek，也可切换到其他 12 家服务商）调用 MCP 点检工具，对软件工程目录执行点检并输出报告。
+极简 Windows 桌面工具：在聊天窗口里让大模型（默认 DeepSeek，也可切换到其他 12 家服务商）调用你配置的 MCP 工具，用来快速验证 MCP Server 的连通性与基本功能。
+
+它面向的是「这个 MCP 到底能不能用」这类通用需求：地址通不通、鉴权对不对、工具列表全不全、单个工具调用是否正常、换模型或换服务商之后链路是否依旧可靠。不预设任何具体业务场景，任何基于 http 的 MCP Server 都可以接进来试。
 
 单文件 exe，约 8 MB，Go 静态编译，**不需要 .NET / Node / Python / VC++ 运行库**，Win10 / Win11 双击即用。
 
@@ -14,7 +16,7 @@
 
 - **单文件绿色小工具**：一个 exe 拷走就能用，无安装动作、无注册表残留
 - **多服务商**：DeepSeek / 阿里云百炼 / 智谱 GLM / Kimi / 讯飞星火 / MiniMax / 硅基流动 / 火山方舟 / 百度千帆 / 腾讯混元 / Ollama（本地）/ OpenRouter，以及「自定义」填任意 OpenAI 兼容地址（含 one-api 等中转）
-- **三栏界面**：左侧配置、中间对话与报告、右侧「MCP 工具调用」面板（参数 / 返回 / 状态实时可见，浅黄=参数、浅绿=返回、浅红=失败）
+- **三栏界面**：左侧配置、中间对话、右侧「MCP 工具调用」面板（参数 / 返回 / 状态实时可见，浅黄=参数、浅绿=返回、浅红=失败）
 - **工具返回完整保留**：长结果默认折叠、可展开，标签旁显示总字数；送给模型的内容另做长度保护
 - **中英双语 + 浅色 / 暗色**：左侧「外观」随时切换，写入 `config.json`
 - **http only**：MCP 支持 Streamable HTTP / SSE，stdio 类型明确标注「暂不支持」
@@ -40,6 +42,16 @@
 
 各家 Base URL 与模型清单均按官方文档逐字符核对；新增厂商只需在 `internal/config/providers.go` 预设表中加一行。
 
+## 适用场景
+
+- **新接一个 MCP Server**：先确认地址、鉴权、传输方式（Streamable HTTP / SSE）能不能连通
+- **核对工具清单**：工具名是否齐全、入参 schema 是否符合预期
+- **逐个试调用**：直接看每个工具的真实返回内容与错误信息，而不是只信文档
+- **换环境后回归**：换模型、换服务商、换 Key 之后，验证工具调用链路是否仍然正常
+- **给别人演示**：不用写脚本，打开窗口聊几句就能把 MCP 跑起来
+
+不针对特定业务：不管你的 MCP 背后是点检、查询、构建还是别的什么，工具只负责把「连通性 + 基本功能」这一层验证清楚。
+
 ## 快速开始
 
 ```powershell
@@ -50,14 +62,14 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 dist\MCP点检助手.exe
 ```
 
-使用四步：**选服务商 → 填 API Key → 保存** → **选择工作区文件夹** → **加载 `mcp.json`** → 输入点检指令（Enter 发送，Shift+Enter 换行）。
+使用四步：**选服务商 → 填 API Key → 保存** → **选择工作区文件夹** → **加载 `mcp.json`** → 输入指令（Enter 发送，Shift+Enter 换行）。
 
 `mcp.json` 格式与 Cursor 相同，例如：
 
 ```json
 {
   "mcpServers": {
-    "dianjian": {
+    "demo": {
       "url": "http://192.168.1.10:3000/mcp",
       "headers": { "Authorization": "Bearer your-token" }
     }
@@ -101,7 +113,7 @@ node "$env:TEMP\paneltest.js"                  # 运行（i18n / 主题 / 服务
 
 ```powershell
 .\dist\mock.exe &
-.\dist\MCP点检助手.exe --headless "请点检工作区" --config .\dist\e2e\config.json
+.\dist\MCP点检助手.exe --headless "列出可用的 MCP 工具" --config .\dist\e2e\config.json
 ```
 
 覆盖的关键回归：厂商预设表完整性与 Base URL 逐字符核对、i18n 文案完备、`/api/providers`、配置往返与非法值忽略、`reasoning_content` 多轮回传、厂商私有参数下发、Ollama 能力降级、右侧面板结构与宽度拖拽。

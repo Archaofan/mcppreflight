@@ -2,7 +2,9 @@
 
 [简体中文](README.md) ｜ **English**
 
-A minimal Windows desktop tool: let an LLM (DeepSeek by default, or any of 12 other providers) call your MCP inspection tools against a source tree and produce a report — right inside a chat window.
+A minimal Windows desktop tool: let an LLM (DeepSeek by default, or any of 12 other providers) call the MCP tools you configured, right inside a chat window — so you can quickly verify that an MCP Server is reachable and that its tools actually work.
+
+It targets the generic question "does this MCP work at all": is the endpoint reachable, is the auth correct, is the tool list complete, does each call succeed, and does the chain still hold after you switch models or providers. No business scenario is assumed — any http-based MCP Server can be plugged in and tried.
 
 A single ~8 MB statically-linked Go exe. **No .NET / Node / Python / VC++ runtime required** — double-click on Windows 10 / 11.
 
@@ -14,7 +16,7 @@ A single ~8 MB statically-linked Go exe. **No .NET / Node / Python / VC++ runtim
 
 - **Single-file portable exe**: copy it and run it — no installer, no registry writes
 - **Multi-provider**: DeepSeek / Aliyun DashScope (Qwen) / Zhipu BigModel (GLM) / Moonshot (Kimi) / iFlytek Spark / MiniMax / SiliconFlow / Volcano Ark (Doubao) / Baidu Qianfan (ERNIE) / Tencent Hunyuan / Ollama (local) / OpenRouter, plus **Custom** for any OpenAI-compatible endpoint (one-api / new-api relays included)
-- **Three-column UI**: config on the left, conversation + report in the middle, live **MCP tool calls** panel on the right (args / result / status — pale yellow = args, pale green = result, pale red = failure)
+- **Three-column UI**: config on the left, conversation in the middle, live **MCP tool calls** panel on the right (args / result / status — pale yellow = args, pale green = result, pale red = failure)
 - **Full tool results kept**: long results are collapsed by default and expandable, with the total character count shown; a separate length guard applies to what is sent to the model
 - **Bilingual UI (zh-CN / en) + light / dark theme**: switch any time from the Appearance section, persisted in `config.json`
 - **http only**: MCP over Streamable HTTP or SSE; stdio servers are explicitly marked unsupported
@@ -40,6 +42,16 @@ A single ~8 MB statically-linked Go exe. **No .NET / Node / Python / VC++ runtim
 
 Every Base URL and model list was verified character-by-character against the official documentation. Adding a provider means adding one row to the preset table in `internal/config/providers.go`.
 
+## What it's for
+
+- **Wiring up a new MCP Server**: confirm the address, the auth headers and the transport (Streamable HTTP / SSE) actually connect
+- **Auditing the tool list**: are all tools present, and do the input schemas match what you expect
+- **Trying calls one by one**: see the real response body and error text instead of trusting the docs
+- **Regression checks**: after switching model, provider or key, verify the tool-calling chain still works
+- **Showing it to someone else**: no scripting needed — open the window and chat
+
+It is not tied to a particular domain: whatever sits behind your MCP — inspection, queries, builds, anything else — the tool only settles the "does it connect and basically work" layer.
+
 ## Quick start
 
 ```powershell
@@ -50,14 +62,14 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 dist\MCP点检助手.exe
 ```
 
-Four steps: **pick a provider → paste your API key → save** → **choose a workspace folder** → **load `mcp.json`** → type an inspection command (Enter to send, Shift+Enter for a newline).
+Four steps: **pick a provider → paste your API key → save** → **choose a workspace folder** → **load `mcp.json`** → type a command (Enter to send, Shift+Enter for a newline).
 
 `mcp.json` uses the same format as Cursor:
 
 ```json
 {
   "mcpServers": {
-    "dianjian": {
+    "demo": {
       "url": "http://192.168.1.10:3000/mcp",
       "headers": { "Authorization": "Bearer your-token" }
     }
@@ -103,7 +115,7 @@ End-to-end without a real API key:
 
 ```powershell
 .\dist\mock.exe &
-.\dist\MCP点检助手.exe --headless "inspect the workspace" --config .\dist\e2e\config.json
+.\dist\MCP点检助手.exe --headless "list the available MCP tools" --config .\dist\e2e\config.json
 ```
 
 Key regressions covered: provider preset integrity and character-exact Base URLs, i18n completeness, `/api/providers`, config round-trip and invalid-value rejection, `reasoning_content` round-trip, provider-specific body parameters, Ollama capability degradation, right-panel structure and width dragging.
