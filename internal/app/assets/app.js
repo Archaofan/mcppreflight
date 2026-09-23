@@ -326,6 +326,9 @@
     sel.innerHTML = state.providers.map(function (p) {
       return '<option value="' + esc(p.id) + '">' + esc(providerLabel(p)) + "</option>";
     }).join("");
+    // 配置里出现未知 ID（如手工编辑过 config.json）时回退到第一个，避免下拉空白
+    var known = state.providers.some(function (p) { return p.id === state.provider; });
+    if (!known && state.providers.length) state.provider = state.providers[0].id;
     sel.value = state.provider || "deepseek";
     applyProviderMeta();
   }
