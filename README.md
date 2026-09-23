@@ -3,7 +3,7 @@
 极简 Windows 桌面工具：在聊天界面中通过 DeepSeek（OpenAI 兼容 API）调用 MCP 点检工具，对软件工程目录执行点检并输出报告。
 
 - **单文件 exe**（约 8 MB，Go 静态编译，无运行时依赖），Win10/Win11 直接双击运行
-- **GUI 开箱即用**：WebView2 渲染的本地界面（未装 WebView2 时自动回退系统浏览器）
+- **GUI 开箱即用**：WebView2 渲染的本地界面（未装 WebView2 时自动回退系统浏览器），三栏布局：左侧配置、中间对话与报告、右侧「MCP 工具调用」面板（参数/返回/状态实时可见）
 - **零手写 JSON 之外的配置**：界面内完成 API Key、模型、工作区、mcp.json 全部配置
 - **http only**：MCP 新服务器支持 Streamable HTTP / SSE 两种传输，stdio 类型明确标注「暂不支持」
 - 本地 API 服务仅监听 `127.0.0.1`，无外网监听、无遥测
